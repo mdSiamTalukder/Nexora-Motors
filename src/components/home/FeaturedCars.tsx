@@ -9,7 +9,7 @@ export async function FeaturedCars() {
     orderBy: {
       createdAt: "desc",
     },
-    take: 3,
+    take: 5,
   });
 
   const cars: Car[] = databaseCars.map((car) => ({
