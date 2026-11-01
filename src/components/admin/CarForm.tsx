@@ -13,13 +13,33 @@ import {
   Upload,
 } from "lucide-react";
 
-export function CarForm() {
+export interface CarFormInitialValues {
+  id: string;
+  year: number;
+  make: string;
+  model: string;
+  trim: string;
+  price: number;
+  mileage: number;
+  transmission: string;
+  fuelType: string;
+  availability: string;
+  image: string;
+  imageAlt: string;
+}
+
+interface CarFormProps {
+  initialCar?: CarFormInitialValues;
+}
+
+export function CarForm({ initialCar }: CarFormProps) {
   const router = useRouter();
+  const isEditing = Boolean(initialCar);
 
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState("");
+  const [previewUrl, setPreviewUrl] = useState(initialCar?.image ?? "");
   const [imageUrl, setImageUrl] = useState("");
-  const [imageAlt, setImageAlt] = useState("");
+  const [imageAlt, setImageAlt] = useState(initialCar?.imageAlt ?? "");
 
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -78,7 +98,7 @@ export function CarForm() {
     const form = event.currentTarget;
     const formData = new FormData(form);
 
-    if (!imageFile) {
+    if (!imageFile && !previewUrl) {
       setError("Please select a car image.");
       return;
     }
@@ -91,25 +111,29 @@ export function CarForm() {
     }
 
     try {
-      setUploading(true);
+      let finalImageUrl = previewUrl;
 
-      const uploadData = new FormData();
-      uploadData.append("image", imageFile);
+      if (imageFile) {
+        setUploading(true);
 
-      const uploadResponse = await fetch("/api/admin/cars/upload", {
-        method: "POST",
-        body: uploadData,
-      });
+        const uploadData = new FormData();
+        uploadData.append("image", imageFile);
 
-      const uploadResult = await uploadResponse.json();
+        const uploadResponse = await fetch("/api/admin/cars/upload", {
+          method: "POST",
+          body: uploadData,
+        });
 
-      if (!uploadResponse.ok || !uploadResult.success) {
-        throw new Error(uploadResult.message || "Image upload failed.");
+        const uploadResult = await uploadResponse.json();
+
+        if (!uploadResponse.ok || !uploadResult.success) {
+          throw new Error(uploadResult.message || "Image upload failed.");
+        }
+
+        finalImageUrl = uploadResult.data.url as string;
+        setImageUrl(finalImageUrl);
+        setUploading(false);
       }
-
-      const uploadedImageUrl = uploadResult.data.url as string;
-      setImageUrl(uploadedImageUrl);
-      setUploading(false);
 
       const carData = {
         year: Number(formData.get("year")),
@@ -121,27 +145,37 @@ export function CarForm() {
         transmission: String(formData.get("transmission")),
         fuelType: String(formData.get("fuelType")),
         availability: String(formData.get("availability")),
-        image: uploadedImageUrl,
+        image: finalImageUrl,
         imageAlt: imageAltValue,
       };
 
       setSaving(true);
 
-      const response = await fetch("/api/admin/cars", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      const response = await fetch(
+        isEditing
+          ? `/api/admin/cars/${encodeURIComponent(initialCar!.id)}`
+          : "/api/admin/cars",
+        {
+          method: isEditing ? "PUT" : "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(carData),
         },
-        body: JSON.stringify(carData),
-      });
+      );
 
       const result = await response.json();
 
       if (!response.ok || !result.success) {
-        throw new Error(result.message || "Unable to save car.");
+        throw new Error(
+          result.message ||
+            (isEditing ? "Unable to update car." : "Unable to save car."),
+        );
       }
 
-      setSuccess("Car added successfully.");
+      setSuccess(
+        isEditing ? "Car updated successfully." : "Car added successfully.",
+      );
 
       router.push("/admin/cars");
       router.refresh();
@@ -171,11 +205,13 @@ export function CarForm() {
         </Link>
 
         <h2 className="text-2xl font-bold text-base-content">
-          Add New Car
+          {isEditing ? "Edit Car" : "Add New Car"}
         </h2>
 
         <p className="mt-1 text-sm text-base-content/60">
-          Enter vehicle information and add it to your showroom inventory.
+          {isEditing
+            ? "Update the vehicle information in your showroom inventory."
+            : "Enter vehicle information and add it to your showroom inventory."}
         </p>
       </div>
 
@@ -197,6 +233,7 @@ export function CarForm() {
                 id="make"
                 name="make"
                 type="text"
+                defaultValue={initialCar?.make}
                 placeholder="e.g. Toyota"
                 className="input input-bordered w-full"
                 maxLength={60}
@@ -212,6 +249,7 @@ export function CarForm() {
                 id="model"
                 name="model"
                 type="text"
+                defaultValue={initialCar?.model}
                 placeholder="e.g. Camry"
                 className="input input-bordered w-full"
                 maxLength={80}
@@ -227,6 +265,7 @@ export function CarForm() {
                 id="trim"
                 name="trim"
                 type="text"
+                defaultValue={initialCar?.trim}
                 placeholder="e.g. Hybrid Premium"
                 className="input input-bordered w-full"
                 maxLength={100}
@@ -244,6 +283,7 @@ export function CarForm() {
                 type="number"
                 min="1900"
                 max={new Date().getFullYear() + 1}
+                defaultValue={initialCar?.year}
                 placeholder="2024"
                 className="input input-bordered w-full"
                 required
@@ -260,6 +300,7 @@ export function CarForm() {
                 type="number"
                 min="1"
                 step="1"
+                defaultValue={initialCar?.price}
                 placeholder="4500000"
                 className="input input-bordered w-full"
                 required
@@ -276,6 +317,7 @@ export function CarForm() {
                 type="number"
                 min="0"
                 step="1"
+                defaultValue={initialCar?.mileage}
                 placeholder="25000"
                 className="input input-bordered w-full"
                 required
@@ -290,7 +332,7 @@ export function CarForm() {
                 id="transmission"
                 name="transmission"
                 className="select select-bordered w-full"
-                defaultValue="Automatic"
+                defaultValue={initialCar?.transmission ?? "Automatic"}
                 required
               >
                 <option value="Automatic">Automatic</option>
@@ -306,7 +348,7 @@ export function CarForm() {
                 id="fuelType"
                 name="fuelType"
                 className="select select-bordered w-full"
-                defaultValue="Petrol"
+                defaultValue={initialCar?.fuelType ?? "Petrol"}
                 required
               >
                 <option value="Petrol">Petrol</option>
@@ -324,7 +366,7 @@ export function CarForm() {
                 id="availability"
                 name="availability"
                 className="select select-bordered w-full"
-                defaultValue="available"
+                defaultValue={initialCar?.availability ?? "available"}
                 required
               >
                 <option value="available">Available</option>
@@ -471,10 +513,14 @@ export function CarForm() {
             {isSubmitting ? (
               <>
                 <LoaderCircle className="size-4 animate-spin" />
-                {uploading ? "Uploading Image..." : "Saving Car..."}
+                {uploading
+                  ? "Uploading Image..."
+                  : isEditing
+                    ? "Updating Car..."
+                    : "Saving Car..."}
               </>
             ) : (
-              "Save Car"
+              isEditing ? "Update Car" : "Save Car"
             )}
           </button>
         </div>

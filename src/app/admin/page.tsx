@@ -251,7 +251,7 @@ export default async function AdminDashboardPage() {
 
                 <div className="text-right">
                   <p className="text-sm font-semibold text-base-content">
-                    ${car.price.toLocaleString("en-US")}
+                    ৳ {car.price.toLocaleString("en-US")}
                   </p>
 
                   <span className="text-xs capitalize text-base-content/55">
